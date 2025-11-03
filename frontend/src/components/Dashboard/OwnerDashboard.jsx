@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWeb3 } from '../../contexts/Web3Context';
-import { Plus, Package, DollarSign, TrendingUp } from 'lucide-react';
+import { Plus, Package, DollarSign, TrendingUp, Loader2 } from 'lucide-react';
 import PropertyCard from '../Property/PropertyCard';
 import { formatEther } from '../../utils/web3';
-import { Loader2 } from 'lucide-react';
 
 const OwnerDashboard = () => {
   const { contract, account } = useWeb3();

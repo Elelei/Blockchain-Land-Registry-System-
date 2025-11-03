@@ -27,11 +27,12 @@ export const Web3Provider = ({ children }) => {
       setContract(result.contract);
       setProvider(result.provider);
 
-      // Get user role
+      // Get user role (non-blocking - if it fails, just default to Property Owner)
       try {
         const userRoleStr = await result.contract.userRoles(result.address);
         setUserRole(userRoleStr || 'Property Owner');
       } catch (error) {
+        console.warn('Could not fetch user role:', error);
         setUserRole('Property Owner');
       }
 
@@ -39,7 +40,8 @@ export const Web3Provider = ({ children }) => {
       return result;
     } catch (error) {
       console.error('Connection error:', error);
-      toast.error(error.message || 'Failed to connect wallet');
+      const errorMessage = error.message || error.reason || 'Failed to connect wallet';
+      toast.error(errorMessage);
       throw error;
     } finally {
       setIsConnecting(false);

@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWeb3 } from '../../contexts/Web3Context';
-import { Search, ShoppingCart, CheckCircle, XCircle, Plus } from 'lucide-react';
+import { Search, ShoppingCart, CheckCircle, XCircle, Plus, Loader2 } from 'lucide-react';
 import PropertyCard from '../Property/PropertyCard';
 import { formatEther } from '../../utils/web3';
-import { PROPERTY_STATUS, TRANSACTION_STATUS } from '../../config/constants';
-import { Loader2 } from 'lucide-react';
+import { PROPERTY_STATUS } from '../../config/constants';
 
 const BuyerDashboard = () => {
   const { contract, account } = useWeb3();

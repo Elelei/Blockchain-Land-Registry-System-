@@ -44,25 +44,54 @@ let contract = null;
 
 export const connectWallet = async () => {
   try {
-    if (typeof window.ethereum !== 'undefined') {
-      // Request account access
-      const accounts = await window.ethereum.request({
+    // Check if MetaMask is installed
+    if (typeof window.ethereum === 'undefined') {
+      throw new Error('MetaMask is not installed. Please install MetaMask extension to connect your wallet.');
+    }
+
+    // Validate contract address
+    if (!CONTRACT_ADDRESS || CONTRACT_ADDRESS === '0x0000000000000000000000000000000000000000') {
+      throw new Error('Contract not deployed. Please deploy the contract first.');
+    }
+
+    // Request account access
+    let accounts;
+    try {
+      accounts = await window.ethereum.request({
         method: 'eth_requestAccounts'
       });
+    } catch (error) {
+      if (error.code === 4001) {
+        throw new Error('Please connect your MetaMask account. The connection request was rejected.');
+      }
+      throw new Error(`Failed to connect to MetaMask: ${error.message}`);
+    }
 
-      // Check network
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-      const chainIdDecimal = parseInt(chainId, 16);
+    if (!accounts || accounts.length === 0) {
+      throw new Error('No accounts found. Please unlock MetaMask and try again.');
+    }
 
-      if (chainIdDecimal !== NETWORK_CHAIN_ID) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: `0x${NETWORK_CHAIN_ID.toString(16)}` }],
-          });
-        } catch (switchError) {
-          // If network doesn't exist, add it
-          if (switchError.code === 4902) {
+    // Check network
+    let chainId;
+    try {
+      chainId = await window.ethereum.request({ method: 'eth_chainId' });
+    } catch (error) {
+      throw new Error(`Failed to get network chain ID: ${error.message}`);
+    }
+
+    const chainIdDecimal = parseInt(chainId, 16);
+
+    if (chainIdDecimal !== NETWORK_CHAIN_ID) {
+      try {
+        // Try to switch network first
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: `0x${NETWORK_CHAIN_ID.toString(16)}` }],
+        });
+      } catch (switchError) {
+        // If network doesn't exist (error code 4902), add it
+        if (switchError.code === 4902 || switchError.code === -32603) {
+          try {
             await window.ethereum.request({
               method: 'wallet_addEthereumChain',
               params: [{
@@ -73,44 +102,52 @@ export const connectWallet = async () => {
                   symbol: 'ETH',
                   decimals: 18
                 },
-                rpcUrls: [RPC_URL]
+                rpcUrls: [RPC_URL],
+                blockExplorerUrls: []
               }]
             });
-          } else {
-            throw switchError;
+          } catch (addError) {
+            throw new Error(`Failed to add network. Please add Local Hardhat network manually:\nNetwork Name: Local Hardhat\nRPC URL: ${RPC_URL}\nChain ID: ${NETWORK_CHAIN_ID}\nCurrency Symbol: ETH`);
           }
+        } else if (switchError.code === 4001) {
+          throw new Error('Please approve the network switch in MetaMask to continue.');
+        } else {
+          throw new Error(`Failed to switch network: ${switchError.message}`);
         }
       }
-
-      provider = new ethers.BrowserProvider(window.ethereum);
-      signer = await provider.getSigner();
-      contract = new ethers.Contract(CONTRACT_ADDRESS, LAND_REGISTRY_ABI, signer);
-
-      return {
-        address: accounts[0],
-        provider,
-        signer,
-        contract
-      };
-    } else {
-      // Fallback to local provider if MetaMask not available
-      provider = new ethers.JsonRpcProvider(RPC_URL);
-      const accounts = await provider.listAccounts();
-      if (accounts.length > 0) {
-        signer = await provider.getSigner(accounts[0]);
-        contract = new ethers.Contract(CONTRACT_ADDRESS, LAND_REGISTRY_ABI, signer);
-        return {
-          address: accounts[0],
-          provider,
-          signer,
-          contract
-        };
-      }
-      throw new Error('MetaMask not installed or no accounts available');
     }
+
+    // Wait a bit for network switch to complete
+    if (chainIdDecimal !== NETWORK_CHAIN_ID) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    // Create provider and signer
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
+
+    // Verify contract address is valid
+    const code = await provider.getCode(CONTRACT_ADDRESS);
+    if (code === '0x') {
+      throw new Error(`No contract found at address ${CONTRACT_ADDRESS}. Please deploy the contract first.`);
+    }
+
+    contract = new ethers.Contract(CONTRACT_ADDRESS, LAND_REGISTRY_ABI, signer);
+
+    return {
+      address: accounts[0],
+      provider,
+      signer,
+      contract
+    };
   } catch (error) {
     console.error('Error connecting wallet:', error);
-    throw error;
+    
+    // Provide user-friendly error messages
+    if (error.message) {
+      throw error;
+    }
+    throw new Error(`Wallet connection failed: ${error.message || 'Unknown error'}`);
   }
 };
 
