@@ -1,0 +1,14 @@
+node_modules
+.env
+.DS_Store
+dist
+build
+*.log
+coverage
+.vscode
+.idea
+contracts/artifacts
+contracts/cache
+contracts/typechain-types
+frontend/dist
+frontend/.vite
